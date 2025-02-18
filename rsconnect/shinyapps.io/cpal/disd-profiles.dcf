@@ -1,0 +1,11 @@
+name: disd-profiles
+title: disd-profiles
+username:
+account: cpal
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 8656189
+bundleId: 9154205
+url: https://cpal.shinyapps.io/disd-profiles/
+asMultiple: FALSE
+asStatic: FALSE

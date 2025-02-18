@@ -1,0 +1,25 @@
+{
+  "name": "Dallas ISD Campus Housing Profiles",
+  "description": "This is a tool generated to give Dallas ISD information related to middle of the year moves and evictions in attendance zones for all school campuses. This is a strong resource for those seeking to understand the housing landscape within specific Dallas ISD attendance zones.
+",
+  "url": "https://cpal.shinyapps.io/disd-profiles/",
+  "pillar": "housing",
+  "buckets": {
+    "geography": [
+      "serviceArea", “schoolCampus”
+    ],
+    "topic": [
+      "housing",
+      "equity"
+    ],
+    "audience": [“external"],
+          "status": [“complete”],
+    "cadence": [
+"yearly"
+]
+  },
+  "image": "/images/directory-images/Housing*1 (Green * Orange).jpg",
+  "toolCreated": "2023-07-01T00:00:00Z",
+  "toolLastUpdated": "2025-02-18T00:00:00Z",
+  "dataLastUpdated": "2025-02-18T00:00:00Z"
+}

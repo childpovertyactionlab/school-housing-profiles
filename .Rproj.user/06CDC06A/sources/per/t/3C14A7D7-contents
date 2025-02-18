@@ -1,0 +1,358 @@
+library(tidyverse)
+library(sf)
+library(rio)
+library(tidycensus)
+library(rmapshaper)
+
+libDB <- "C:/Users/Michael/CPAL Dropbox/" # michael laptop download
+#libDB <- "E:/CPAL Dropbox/" # michael laptop download
+
+libGH <- "C:/Users/Michael/Documents/GitHub/"
+
+##### ACS Demographics #####
+acsb <- load_variables(2022, "acs5", cache = TRUE)
+acss <- load_variables(2022, "acs5/subject", cache = TRUE)
+
+# Import demographic variables from TidyCensus #
+counties <- c("Dallas County", 
+              "Collin County", 
+              "Denton County", 
+              "Tarrant County")
+
+ntx_counties <- tigris::counties(state = "TX") %>%
+  filter(NAMELSAD %in% counties)
+
+acs_var <- c(
+  tot_pop = "B01003_001", #total population
+  pop_u18 = "B17006_001", #population under 18
+  med_inc = "B19013_001", #median household income
+  med_rent = "B25031_001", #median monthly housing costs
+  his_pop = "B03002_012", #hispanic population
+  wh_pop = "B03002_003", #white population
+  bl_pop = "B03002_004", #black population
+  as_pop = "B03002_006", #asian population
+  rohh = "B25106_024", #renter-occupied households
+  thh = "B25106_001", #total households
+  pop_bp = "B17020_002", #population below poverty
+  bp_u18 = "B17006_002", #population under 18 below poverty
+  med_val = "B25097_001", #median value of owner-occupied housing units
+  rcb1 = "B25106_028", #gross rent as a percentage of income 30% or more,
+  rcb2 = "B25106_032",
+  rcb3 = "B25106_036",
+  rcb4 = "B25106_040",
+  rcb5 = "B25106_044"
+)
+
+census_tract <- get_acs(geography = "tract", 
+                        state = "TX",
+                        county = counties,
+                        variables = acs_var,
+                        year = 2022, 
+                        survey = "acs5", 
+                        output = "wide",
+                        geometry = TRUE) %>%
+  mutate(rcbE = rcb1E+rcb2E+rcb3E+rcb4E+rcb5E) %>%
+  st_transform(crs = 6584) %>%
+  mutate(AreaTract = as.numeric(st_area(.)))
+
+costar <- import(paste0(libDB, "Data Library/COSTAR/Processed Data/Multi-Family Apartments (September 2023).csv")) %>%
+  janitor::clean_names(.) %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
+  filter(number_of_units > 1) %>%
+  mutate(zipshort = ifelse(nchar(zip) == 10, str_sub(zip, end=-6), 
+                           ifelse(nchar(zip) == 8, str_sub(zip, end=-4), zip)),
+         wgtRent = number_of_units*avg_asking_unit) %>%
+  st_transform(crs = 6584)
+
+##### Eviction Data #####
+schoolyears <- function(x) {
+  ifelse(x >= as.Date("2024-08-07") & x < as.Date("2025-05-22"), "2024-2025",
+         ifelse(x >= as.Date("2023-08-09") & x < as.Date("2024-05-23"), "2023-2024", 
+                ifelse(x >= as.Date("2022-08-15") & x < as.Date("2023-05-26"), "2022-2023", 
+                       ifelse(x >= as.Date("2021-08-16") & x < as.Date("2022-05-27"), "2021-2022", 
+                              ifelse(x >= as.Date("2020-08-17") & x < as.Date("2021-05-27"), "2020-2021", 
+                                     ifelse(x >= as.Date("2019-08-19") & x < as.Date("2020-05-27"), "2019-2020", 
+                                            ifelse(x >= as.Date("2018-08-20") & x < as.Date("2019-05-29"), "2018-2019",
+                                                   ifelse(x >= as.Date("2017-08-28") & x < as.Date("2018-06-01"), "2017-2018", "ERROR"))))))))
+}
+
+yearSchool <- function(x){
+  ifelse(x == "2017-2018", 2017,
+         ifelse(x == "2018-2019", 2018,
+                ifelse(x == "2019-2020", 2019,
+                       ifelse(x == "2020-2021", 2020,
+                              ifelse(x == "2021-2022", 2021,
+                                     ifelse(x == "2022-2023", 2022,
+                                            ifelse(x == "2023-2024", 2023,
+                                                   ifelse(x == "2024-2025", 2024, "ERROR"
+                                                   ))))))))
+}
+
+evictions <- import(paste0(libGH, "cpal-evictions/filing data/NTEP_eviction_cases.csv")) %>%
+  filter(!is.na(lon) | !is.na(lat)) %>%
+  st_as_sf(coords = c(x = "lon", y = "lat"), crs = 4326) %>%
+  st_transform(crs = 6584) %>%
+  mutate(SchoolYear = schoolyears(x = date)) %>%
+  filter(SchoolYear != "ERROR")
+
+#middle of year moves for elementary schools
+moym <- googlesheets4::read_sheet(ss = "https://docs.google.com/spreadsheets/d/1CF2OuTe_dEKoUa9UPJvwta2tuwEXEAl-7OUdk82mY-M/",
+                   sheet = "Change by Campus ID") %>%
+  janitor::clean_names(.) %>%
+  filter(!is.na(campus)) %>%
+  transmute(SLN = as.double(tea_campus_id),
+            moymPerGr1t3_24 = as.numeric(percent_moy_moves_grades_1_3_2023_2024),
+            moymPerGrkt5_24 = as.numeric(percent_moy_moves_grades_kn_5_2023_2024),
+            moymPerGr1t3_23 = as.numeric(percent_moy_moves_grades_1_3_2022_2023),
+            moymPerGrkt5_23 = as.numeric(percent_moy_moves_grades_kn_5_2022_2023),
+            moymGr1t3_24 = as.numeric(number_moy_moves_grades_1_3_2023_2024),
+            moymGrkt5_24 = as.numeric(number_moy_moves_grades_kn_5_2023_2024),
+            moymGr1t3_23 = as.numeric(number_moy_moves_grades_1_3_2022_2023),
+            moymGrkt5_23 = as.numeric(number_moy_moves_grades_kn_5_2022_2023))
+
+#### DISD School Boundary Demographics #####
+campus_elem <- st_read(paste0(libDB, "Data Library/Dallas Independent School District/2023_2024 School Year/Elementary_Attendance_Boundaries.shp")) %>%
+  select(SLN, ELEM_DESC, geometry) %>%
+  st_transform(crs = 6584) %>%
+  st_intersection(census_tract, .) %>%
+  mutate(SLN = SLN,
+         name = ELEM_DESC,
+         AreaIntersect = as.numeric(st_area(.)),
+         PerIntersect = AreaIntersect/AreaTract,
+         pop_intersect = round(PerIntersect*tot_popE, digits = 4),
+         popbp_intersect = round(PerIntersect*pop_bpE, digits = 4),
+         popu18_intersect = round(PerIntersect*pop_u18E, digits = 4),
+         bpu18_intersect = round(PerIntersect*bp_u18E, digits = 4),
+         rohh_intersect = round(PerIntersect*rohhE, digits = 4),
+         thh_intersect = round(PerIntersect*thhE, digits = 4),
+         rcb_intersect = round(PerIntersect*rcbE, digits = 4),
+         as_intersect = round(PerIntersect*as_popE, digits = 4),
+         bl_intersect = round(PerIntersect*bl_popE, digits = 4),
+         wh_intersect = round(PerIntersect*wh_popE, digits = 4),
+         his_intersect = round(PerIntersect*his_popE, digits = 4)
+  ) %>%
+  group_by(SLN, name) %>%
+  summarise(tot_pop = sum(pop_intersect),
+            bp_pop = sum(popbp_intersect)/tot_pop,
+            bp_u18 = sum(bpu18_intersect),
+            rohh = sum(rohh_intersect),
+            thh = sum(thh_intersect), 
+            med_rent = mean(med_rentE, na.rm = TRUE),
+            mhi = mean(med_incE, na.rm = TRUE),
+            per_as = sum(as_intersect)/tot_pop,
+            per_bl = sum(bl_intersect)/tot_pop,
+            per_wh = sum(wh_intersect)/tot_pop,
+            per_his = sum(his_intersect)/tot_pop) %>%
+  select(SLN, name, tot_pop:per_his) %>%
+  mutate(name = str_remove(name, " School"))
+
+campus_midd <- st_read(paste0(libDB, "Data Library/Dallas Independent School District/2023_2024 School Year/Middle_Attendance_Boundaries.shp")) %>%
+  select(MID_SLN, MIDDLE, geometry) %>%
+  st_transform(crs = 6584) %>%
+  st_intersection(census_tract, .) %>%
+  mutate(SLN = MID_SLN,
+         name = MIDDLE,
+         AreaIntersect = as.numeric(st_area(.)),
+         PerIntersect = AreaIntersect/AreaTract,
+         pop_intersect = round(PerIntersect*tot_popE, digits = 4),
+         popbp_intersect = round(PerIntersect*pop_bpE, digits = 4),
+         popu18_intersect = round(PerIntersect*pop_u18E, digits = 4),
+         bpu18_intersect = round(PerIntersect*bp_u18E, digits = 4),
+         rohh_intersect = round(PerIntersect*rohhE, digits = 4),
+         thh_intersect = round(PerIntersect*thhE, digits = 4),
+         rcb_intersect = round(PerIntersect*rcbE, digits = 4),
+         as_intersect = round(PerIntersect*as_popE, digits = 4),
+         bl_intersect = round(PerIntersect*bl_popE, digits = 4),
+         wh_intersect = round(PerIntersect*wh_popE, digits = 4),
+         his_intersect = round(PerIntersect*his_popE, digits = 4)
+  ) %>%
+  group_by(SLN, name) %>%
+  summarise(tot_pop = sum(pop_intersect),
+            bp_pop = sum(popbp_intersect)/tot_pop,
+            bp_u18 = sum(bpu18_intersect),
+            rohh = sum(rohh_intersect),
+            thh = sum(thh_intersect), 
+            med_rent = mean(med_rentE, na.rm = TRUE),
+            mhi = mean(med_incE, na.rm = TRUE),
+            per_as = sum(as_intersect)/tot_pop,
+            per_bl = sum(bl_intersect)/tot_pop,
+            per_wh = sum(wh_intersect)/tot_pop,
+            per_his = sum(his_intersect)/tot_pop) %>%
+  select(SLN, name, tot_pop:per_his) %>%
+  mutate(name = paste(name, " Middle"))
+
+campus_high <- st_read(paste0(libDB, "Data Library/Dallas Independent School District/2023_2024 School Year/High_Attendance_Boundaries.shp")) %>%
+  select(HIGH_SLN, HIGH, geometry) %>%
+  st_transform(crs = 6584) %>%
+  st_intersection(census_tract, .) %>%
+  mutate(SLN = HIGH_SLN,
+         name = HIGH,
+         AreaIntersect = as.numeric(st_area(.)),
+         PerIntersect = AreaIntersect/AreaTract,
+         pop_intersect = round(PerIntersect*tot_popE, digits = 4),
+         popbp_intersect = round(PerIntersect*pop_bpE, digits = 4),
+         popu18_intersect = round(PerIntersect*pop_u18E, digits = 4),
+         bpu18_intersect = round(PerIntersect*bp_u18E, digits = 4),
+         rohh_intersect = round(PerIntersect*rohhE, digits = 4),
+         thh_intersect = round(PerIntersect*thhE, digits = 4),
+         rcb_intersect = round(PerIntersect*rcbE, digits = 4),
+         as_intersect = round(PerIntersect*as_popE, digits = 4),
+         bl_intersect = round(PerIntersect*bl_popE, digits = 4),
+         wh_intersect = round(PerIntersect*wh_popE, digits = 4),
+         his_intersect = round(PerIntersect*his_popE, digits = 4)
+  ) %>%
+  group_by(SLN, name) %>%
+  summarise(tot_pop = sum(pop_intersect),
+            bp_pop = sum(popbp_intersect)/tot_pop,
+            bp_u18 = sum(bpu18_intersect),
+            rohh = sum(rohh_intersect),
+            thh = sum(thh_intersect), 
+            med_rent = mean(med_rentE, na.rm = TRUE),
+            mhi = mean(med_incE, na.rm = TRUE),
+            per_as = sum(as_intersect)/tot_pop,
+            per_bl = sum(bl_intersect)/tot_pop,
+            per_wh = sum(wh_intersect)/tot_pop,
+            per_his = sum(his_intersect)/tot_pop) %>%
+  select(SLN, name, tot_pop:per_his) %>%
+  mutate(name = paste(name, " High"))
+
+campuses_point <- st_read(paste0(libDB, "Data Library/Dallas Independent School District/2023_2024 School Year/Campus_Locations.shp")) %>%
+  st_transform(crs = 6584) %>%
+  mutate(schoolType = paste(LEVEL_, "School"),
+         name = SCHOOLNAME) %>%
+  select(SLN, name, schoolType, geometry)
+
+pointjoin <- campuses_point %>%
+  st_drop_geometry(.) %>%
+  select(SLN, schoolType)
+
+campus_shapes <- rbind(campus_elem, campus_midd, campus_high) %>%
+  left_join(., pointjoin) %>%
+  select(SLN, name, schoolType, geometry) %>%
+  filter(!is.na(schoolType))
+
+campuses_points <- campuses_point %>%
+  filter(SLN %in% campus_shapes$SLN) %>%
+  select(-name) %>%
+  left_join(., st_drop_geometry(campus_shapes))
+
+st_write(campus_shapes, "Shiny/disd-profiles/data/DISD Campus Feeder Patterns.geojson", delete_dsn = TRUE)
+st_write(campuses_points, "Shiny/disd-profiles/data/DISD Campus Point Locations.geojson", delete_dsn = TRUE)
+
+##### Housing Profile Demographics #####
+profile_elem <- costar %>%
+  st_join(., campus_elem) %>%
+  st_drop_geometry(.) %>%
+  filter(!is.na(SLN)) %>%
+  group_by(SLN, name) %>%
+  summarize(tot_mf = n(),
+            tot_units = sum(number_of_units, na.rm = TRUE),
+            MAR = mean(avg_asking_unit, na.rm = TRUE)
+            ) %>%
+  mutate(IncomeNeed = (MAR*4)*12) %>%
+  left_join(campus_elem, .) %>%
+  left_join(., moym)
+
+profile_midd <- costar %>%
+  st_join(., campus_midd) %>%
+  st_drop_geometry(.) %>%
+  filter(!is.na(SLN)) %>%
+  group_by(SLN, name) %>%
+  summarize(tot_mf = n(),
+            tot_units = sum(number_of_units, na.rm = TRUE),
+            MAR = mean(avg_asking_unit, na.rm = TRUE)
+  ) %>%
+  mutate(IncomeNeed = (MAR*4)*12) %>%
+  left_join(campus_midd, .) %>%
+  mutate(moymPerGr1t3_24 = NA,
+         moymPerGrkt5_24 = NA,
+         moymPerGr1t3_24 = NA,
+         moymPerGrkt5_24 = NA)
+
+profile_high <- costar %>%
+  st_join(., campus_high) %>%
+  st_drop_geometry(.) %>%
+  filter(!is.na(SLN)) %>%
+  group_by(SLN, name) %>%
+  summarize(tot_mf = n(),
+            tot_units = sum(number_of_units, na.rm = TRUE),
+            MAR = mean(avg_asking_unit, na.rm = TRUE)
+  ) %>%
+  mutate(IncomeNeed = (MAR*4)*12) %>%
+  left_join(campus_high, .) %>%
+  mutate(moymPerGr1t3_24 = NA,
+         moymPerGrkt5_24 = NA,
+         moymPerGr1t3_24 = NA,
+         moymPerGrkt5_24 = NA)
+
+profile_campus <- rbind(st_drop_geometry(profile_elem), 
+                        st_drop_geometry(profile_midd), 
+                        st_drop_geometry(profile_high)) %>%
+  mutate(tot_mf = ifelse(is.na(tot_mf), 0, tot_mf),
+         tot_units = ifelse(is.na(tot_units), 0, tot_units))
+
+##### Eviction Filings in Feeders #####
+evic_elem <-  evictions %>%
+  st_join(., campus_elem) %>%
+  st_drop_geometry(.) %>%
+  filter(!is.na(SLN)) %>%
+  group_by(SLN, name, SchoolYear) %>%
+  summarize(TotEvictions = n(),
+            EvicFilAmt = mean(amount, na.rm = TRUE)) %>%
+  mutate(Year = yearSchool(x = SchoolYear)) %>%
+  left_join(., st_drop_geometry(profile_elem)) %>%
+  mutate(evicRate = (TotEvictions/rohh)*1000,
+         schoolType = "Elementary School") %>%
+  select(-(tot_pop:bp_u18), -(thh:IncomeNeed))
+
+evic_midd <-  evictions %>%
+  st_join(., campus_midd) %>%
+  st_drop_geometry(.) %>%
+  filter(!is.na(SLN)) %>%
+  group_by(SLN, name, SchoolYear) %>%
+  summarize(TotEvictions = n(),
+            EvicFilAmt = mean(amount, na.rm = TRUE)) %>%
+  mutate(Year = yearSchool(x = SchoolYear)) %>%
+  left_join(., st_drop_geometry(profile_midd)) %>%
+  mutate(evicRate = (TotEvictions/rohh)*1000,
+         schoolType = "Middle School") %>%
+  select(-(tot_pop:bp_u18), -(thh:IncomeNeed))
+
+evic_high <-  evictions %>%
+  st_join(., campus_high) %>%
+  st_drop_geometry(.) %>%
+  filter(!is.na(SLN)) %>%
+  group_by(SLN, name, SchoolYear) %>%
+  summarize(TotEvictions = n(),
+            EvicFilAmt = mean(amount, na.rm = TRUE)) %>%
+  mutate(Year = yearSchool(x = SchoolYear)) %>%
+  left_join(., st_drop_geometry(profile_high)) %>%
+  mutate(evicRate = (TotEvictions/rohh)*1000,
+         schoolType = "High School") %>%
+  select(-(tot_pop:bp_u18), -(thh:IncomeNeed))
+
+evic_all <- evic_elem %>%
+  group_by(Year, SchoolYear) %>%
+  summarize(rohh = sum(rohh, na.rm = TRUE),
+            TotEvictions = sum(TotEvictions, na.rm = TRUE)) %>%
+  mutate(evicRate = (TotEvictions/rohh)*1000,
+         schoolType = "Dallas ISD",
+         name = "Dallas ISD")
+
+evic_schools <- rbind(evic_elem, evic_midd, evic_high, evic_all)
+
+st_write(profile_elem, "Data/DISD Demographic Elementary School Profiles.geojson", delete_dsn = TRUE)
+st_write(profile_midd, "Data/DISD Demographic Middle School Profiles.geojson", delete_dsn = TRUE)
+st_write(profile_high, "Data/DISD Demographic High School Profiles.geojson", delete_dsn = TRUE)
+
+export(profile_campus, "Data/DISD Demographic Campus Profiles.csv")
+export(evic_schools, "Data/DISD Evictions by Boundary.csv")
+
+st_write(profile_elem, "Shiny/disd-profiles/data/DISD Demographic Elementary School Profiles.geojson", delete_dsn = TRUE)
+st_write(profile_midd, "Shiny/disd-profiles/data/DISD Demographic Middle School Profiles.geojson", delete_dsn = TRUE)
+st_write(profile_high, "Shiny/disd-profiles/data/DISD Demographic High School Profiles.geojson", delete_dsn = TRUE)
+
+export(evic_schools, "Shiny/disd-profiles/data/DISD Evictions by Boundary.csv")
+export(profile_campus, "Shiny/disd-profiles/data/DISD Demographic Campus Profiles.csv")
+
+sum(campus_high$tot_pop)
