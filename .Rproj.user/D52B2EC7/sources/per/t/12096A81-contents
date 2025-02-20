@@ -8,21 +8,17 @@ library(DT)
 library(highcharter)
 
 ##### Data #####
-#import data for each campus
-wd <- "/Users/erose/CPAL Dropbox/Housing/04_Projects/School Housing Profiles/"
-#wd <- "C:/Users/Michael/CPAL Dropbox/Housing/04_Projects/School Housing Profiles/shiny/disd-profiles/"
-# wd <- ""
 
-disdevictions <- rio::import(paste0(wd, "data/DISD Evictions by Boundary.csv")) %>%
+disdevictions <- rio::import("data/DISD Evictions by Boundary.csv") %>%
   filter(SchoolYear != "2024-2025")
-disdprofiles <- rio::import(paste0(wd, "data/DISD Demographic Campus Profiles.csv"))
-disdpoints <- st_read(paste0(wd, "data/DISD Campus Point Locations.geojson")) %>%
+disdprofiles <- rio::import("data/DISD Demographic Campus Profiles.csv")
+disdpoints <- st_read("data/DISD Campus Point Locations.geojson") %>%
   st_transform(crs = 4326)
-disdfeeder <- st_read(paste0(wd, "data/DISD Campus Feeder Patterns.geojson")) %>%
+disdfeeder <- st_read(paste0("data/DISD Campus Feeder Patterns.geojson")) %>%
   st_transform(crs = 4326)
-disdloc <- st_read(paste0(wd, 'data/Campus_Locations/Campus_Locations.shp'))%>%
+disdloc <- st_read(paste0('data/Campus_Locations/Campus_Locations.shp'))%>%
   st_transform(crs = 4326)
-hs_moy <- readxl::read_xlsx(paste0(wd, "data/2023-2024 MOYM Analysis.xlsx"), sheet = 6)%>%
+hs_moy <- readxl::read_xlsx(paste0("data/2023-2024 MOYM Analysis.xlsx"), sheet = 6)%>%
   filter(!is.na(Campus))%>%
   rename("moymPerGrkt5_24" = "% MOY Moves (Grades Kn-5)",
          "moymGrkt5_24" = '# MOY Moves (Grades Kn-5)',
@@ -36,7 +32,7 @@ disdprofiles <- disdprofiles %>%
     moymPerGrkt5_24 = ifelse(is.na(moymPerGrkt5_24.x), moymPerGrkt5_24.y, moymPerGrkt5_24.x)
   ) %>%
   select(-moymGrkt5_24.x, -moymGrkt5_24.y, -moymPerGrkt5_24.x, -moymPerGrkt5_24.y)
-hs_moy23 <- readxl::read_xlsx(paste0(wd, "data/2022-2023 MOYM Analysis.xlsx"), sheet = 2)%>%
+hs_moy23 <- readxl::read_xlsx("data/2022-2023 MOYM Analysis.xlsx", sheet = 2)%>%
   rename("moymPerGrkt5_23" = "% MOY Moves (Grades Kn-5)",
          "moymGrkt5_23" = '# MOY Moves (Grades Kn-5)',
          "name"= "HIGH")%>%

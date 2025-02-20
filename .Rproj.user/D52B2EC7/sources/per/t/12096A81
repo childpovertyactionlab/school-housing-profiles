@@ -3,7 +3,7 @@
     "path": "~/GitHub/school-housing-profiles/app.R",
     "project_path": "app.R",
     "type": "r_source",
-    "hash": "118376759",
+    "hash": "412801424",
     "contents": "",
     "dirty": false,
     "created": 1740074883509.0,
@@ -12,15 +12,15 @@
     "properties": {
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "5,16",
-        "scrollLine": "0"
+        "cursorPosition": "32,7",
+        "scrollLine": "17"
     },
     "folds": "",
-    "lastKnownWriteTime": 1740074897,
+    "lastKnownWriteTime": 1740075913,
     "encoding": "ISO8859-1",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1740074897820,
+    "last_content_update": 1740075913861,
     "read_only": false,
     "read_only_alternatives": []
 }
