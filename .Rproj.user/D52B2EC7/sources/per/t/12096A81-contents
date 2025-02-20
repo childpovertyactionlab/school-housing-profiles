@@ -9,7 +9,7 @@ library(highcharter)
 
 ##### Data #####
 #import data for each campus
-wd <- "/Users/erose/CPAL Dropbox/Housing/04_Projects/School Housing Profiles/shiny/disd-profiles/"
+wd <- "/Users/erose/CPAL Dropbox/Housing/04_Projects/School Housing Profiles/"
 #wd <- "C:/Users/Michael/CPAL Dropbox/Housing/04_Projects/School Housing Profiles/shiny/disd-profiles/"
 # wd <- ""
 
