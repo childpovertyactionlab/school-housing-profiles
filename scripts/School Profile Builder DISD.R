@@ -3,15 +3,16 @@ library(sf)
 library(rio)
 library(tidycensus)
 library(rmapshaper)
-
+library(readxl)
+library(tidygeocoder)
 libDB <- "C:/Users/erose/CPAL Dropbox/" # michael laptop download
 #libDB <- "E:/CPAL Dropbox/" # michael laptop download
 
 libGH <- "C:/Users/erose/Documents/GitHub/"
 
 ##### ACS Demographics #####
-acsb <- load_variables(2022, "acs5", cache = TRUE)
-acss <- load_variables(2022, "acs5/subject", cache = TRUE)
+acsb <- load_variables(2023, "acs5", cache = TRUE)
+acss <- load_variables(2023, "acs5/subject", cache = TRUE)
 
 # Import demographic variables from TidyCensus #
 counties <- c("Dallas County", 
@@ -24,7 +25,7 @@ ntx_counties <- tigris::counties(state = "TX") %>%
 
 acs_var <- c(
   tot_pop = "B01003_001", #total population
-  pop_u18 = "B17006_001", #population under 18
+  pop_u18 = "B09001_001", #population under 18 #previously "B17006_001"
   med_inc = "B19013_001", #median household income
   med_rent = "B25031_001", #median monthly housing costs
   his_pop = "B03002_012", #hispanic population
@@ -32,7 +33,7 @@ acs_var <- c(
   bl_pop = "B03002_004", #black population
   as_pop = "B03002_006", #asian population
   rohh = "B25106_024", #renter-occupied households
-  thh = "B25106_001", #total households
+  thh = "B25106_001", #total households 
   pop_bp = "B17020_002", #population below poverty
   bp_u18 = "B17006_002", #population under 18 below poverty
   med_val = "B25097_001", #median value of owner-occupied housing units
@@ -47,7 +48,7 @@ census_tract <- get_acs(geography = "tract",
                         state = "TX",
                         county = counties,
                         variables = acs_var,
-                        year = 2022, 
+                        year = 2023, 
                         survey = "acs5", 
                         output = "wide",
                         geometry = TRUE) %>%
@@ -55,9 +56,8 @@ census_tract <- get_acs(geography = "tract",
   st_transform(crs = 6584) %>%
   mutate(AreaTract = as.numeric(st_area(.)))
 
-costar <- import(paste0(libDB, "Data Library/COSTAR/Processed Data/Multi-Family Apartments (September 2023).csv")) %>%
+costar <- st_read("data/Costar Dallas Multifamily April 2024.geojson") %>%
   janitor::clean_names(.) %>%
-  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
   filter(number_of_units > 1) %>%
   mutate(zipshort = ifelse(nchar(zip) == 10, str_sub(zip, end=-6), 
                            ifelse(nchar(zip) == 8, str_sub(zip, end=-4), zip)),
@@ -88,7 +88,7 @@ yearSchool <- function(x){
                                                    ))))))))
 }
 
-evictions <- import(paste0(libGH, "cpal-evictions/filing data/NTEP_eviction_cases.csv")) %>%
+evictions <- import("data/NTEP_eviction_cases.csv") %>%
   filter(!is.na(lon) | !is.na(lat)) %>%
   st_as_sf(coords = c(x = "lon", y = "lat"), crs = 4326) %>%
   st_transform(crs = 6584) %>%
@@ -96,19 +96,20 @@ evictions <- import(paste0(libGH, "cpal-evictions/filing data/NTEP_eviction_case
   filter(SchoolYear != "ERROR")
 
 #middle of year moves for elementary schools
-moym <- googlesheets4::read_sheet(ss = "https://docs.google.com/spreadsheets/d/1CF2OuTe_dEKoUa9UPJvwta2tuwEXEAl-7OUdk82mY-M/",
-                   sheet = "Change by Campus ID") %>%
+# moym <- googlesheets4::read_sheet(ss = "https://docs.google.com/spreadsheets/d/1CF2OuTe_dEKoUa9UPJvwta2tuwEXEAl-7OUdk82mY-M/",
+#                    sheet = "Change by Campus ID") %>%
+moym <- read_excel("data/2024-2025 MOYM Analysis.xlsx", sheet = "Change by Campus ID") %>% 
   janitor::clean_names(.) %>%
   filter(!is.na(campus)) %>%
   transmute(SLN = as.double(tea_campus_id),
-            moymPerGr1t3_24 = as.numeric(percent_moy_moves_grades_1_3_2023_2024),
-            moymPerGrkt5_24 = as.numeric(percent_moy_moves_grades_kn_5_2023_2024),
-            moymPerGr1t3_23 = as.numeric(percent_moy_moves_grades_1_3_2022_2023),
-            moymPerGrkt5_23 = as.numeric(percent_moy_moves_grades_kn_5_2022_2023),
-            moymGr1t3_24 = as.numeric(number_moy_moves_grades_1_3_2023_2024),
-            moymGrkt5_24 = as.numeric(number_moy_moves_grades_kn_5_2023_2024),
-            moymGr1t3_23 = as.numeric(number_moy_moves_grades_1_3_2022_2023),
-            moymGrkt5_23 = as.numeric(number_moy_moves_grades_kn_5_2022_2023))
+            moymPerGr1t3_24 = as.numeric(percent_moy_moves_grades_1_3_2024_2025),
+            moymPerGrkt5_24 = as.numeric(percent_moy_moves_grades_kn_5_2024_2025),
+            moymPerGr1t3_23 = as.numeric(percent_moy_moves_grades_1_3_2023_2024),
+            moymPerGrkt5_23 = as.numeric(percent_moy_moves_grades_kn_5_2023_2024),
+            moymGr1t3_24 = as.numeric(number_moy_moves_grades_1_3_2024_2025),
+            moymGrkt5_24 = as.numeric(number_moy_moves_grades_kn_5_2024_2025),
+            moymGr1t3_23 = as.numeric(number_moy_moves_grades_1_3_2023_2024),
+            moymGrkt5_23 = as.numeric(number_moy_moves_grades_kn_5_2023_2024))
 
 #### DISD School Boundary Demographics #####
 campus_elem <- st_read(paste0(libDB, "Data Library/Dallas Independent School District/2024_2025 School Year/Elementary_Attendance_Boundaries.geojson")) %>%
@@ -348,9 +349,9 @@ st_write(profile_high, "Data/DISD Demographic High School Profiles.geojson", del
 export(profile_campus, "Data/DISD Demographic Campus Profiles.csv")
 export(evic_schools, "Data/DISD Evictions by Boundary.csv")
 
-st_write(profile_elem, "Shiny/disd-profiles/data/DISD Demographic Elementary School Profiles.geojson", delete_dsn = TRUE)
-st_write(profile_midd, "Shiny/disd-profiles/data/DISD Demographic Middle School Profiles.geojson", delete_dsn = TRUE)
-st_write(profile_high, "Shiny/disd-profiles/data/DISD Demographic High School Profiles.geojson", delete_dsn = TRUE)
+st_write(profile_elem, "data/DISD Demographic Elementary School Profiles.geojson", delete_dsn = TRUE)
+st_write(profile_midd, "data/DISD Demographic Middle School Profiles.geojson", delete_dsn = TRUE)
+st_write(profile_high, "data/DISD Demographic High School Profiles.geojson", delete_dsn = TRUE)
 
 export(evic_schools, "Shiny/disd-profiles/data/DISD Evictions by Boundary.csv")
 export(profile_campus, "Shiny/disd-profiles/data/DISD Demographic Campus Profiles.csv")

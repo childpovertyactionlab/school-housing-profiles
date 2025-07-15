@@ -1,0 +1,26 @@
+{
+    "id": "C42BCBE3",
+    "path": "~/GitHub/school-housing-profiles/scripts/School Profile Builder DISD.R",
+    "project_path": "scripts/School Profile Builder DISD.R",
+    "type": "r_source",
+    "hash": "0",
+    "contents": "",
+    "dirty": true,
+    "created": 1752167558750.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "304,17",
+        "scrollLine": "288"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1752172744,
+    "encoding": "ISO8859-1",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1752591859881,
+    "read_only": false,
+    "read_only_alternatives": []
+}

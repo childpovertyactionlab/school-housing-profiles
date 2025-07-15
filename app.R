@@ -9,8 +9,7 @@ library(highcharter)
 
 ##### Data #####
 
-disdevictions <- rio::import("data/DISD Evictions by Boundary.csv") %>%
-  filter(SchoolYear != "2024-2025")
+disdevictions <- rio::import("data/DISD Evictions by Boundary.csv")
 disdprofiles <- rio::import("data/DISD Demographic Campus Profiles.csv")
 disdpoints <- st_read("data/DISD Campus Point Locations.geojson") %>%
   st_transform(crs = 4326)
@@ -18,32 +17,54 @@ disdfeeder <- st_read(paste0("data/DISD Campus Feeder Patterns.geojson")) %>%
   st_transform(crs = 4326)
 disdloc <- st_read(paste0('data/Campus_Locations/Campus_Locations.shp'))%>%
   st_transform(crs = 4326)
-hs_moy <- readxl::read_xlsx(paste0("data/2023-2024 MOYM Analysis.xlsx"), sheet = 6)%>%
-  filter(!is.na(Campus))%>%
-  rename("moymPerGrkt5_24" = "% MOY Moves (Grades Kn-5)",
-         "moymGrkt5_24" = '# MOY Moves (Grades Kn-5)',
-         "name"= "Campus")%>%
-  mutate(name = paste0(name, "  High"))
-hs_moy <- hs_moy[-1,]
-disdprofiles <- disdprofiles %>%
-  left_join(hs_moy, by = "name") %>%
-  mutate(
-    moymGrkt5_24 = ifelse(is.na(moymGrkt5_24.x), moymGrkt5_24.y, moymGrkt5_24.x), 
-    moymPerGrkt5_24 = ifelse(is.na(moymPerGrkt5_24.x), moymPerGrkt5_24.y, moymPerGrkt5_24.x)
+
+# 2024-2025 data
+hs_moy24 <- readxl::read_xlsx("data/2024-2025 MOYM Analysis.xlsx", sheet = 6) %>%
+  filter(!is.na(Campus)) %>%
+  rename(
+    moymPerGrkt5_24hs = "% MOY Moves (Grades Kn-5)",
+    moymGrkt5_24hs = '# MOY Moves (Grades Kn-5)',
+    name = "Campus"
   ) %>%
-  select(-moymGrkt5_24.x, -moymGrkt5_24.y, -moymPerGrkt5_24.x, -moymPerGrkt5_24.y)
-hs_moy23 <- readxl::read_xlsx("data/2022-2023 MOYM Analysis.xlsx", sheet = 2)%>%
-  rename("moymPerGrkt5_23" = "% MOY Moves (Grades Kn-5)",
-         "moymGrkt5_23" = '# MOY Moves (Grades Kn-5)',
-         "name"= "HIGH")%>%
+  mutate(name= paste0(name, "  High")) %>%
+  select(name, moymGrkt5_24hs, moymPerGrkt5_24hs)
+# Remove row 1 if it's a duplicate header
+
+
+disdprofiles <- disdprofiles %>%
+  left_join(hs_moy24, by = "name") %>%
+  mutate(
+    moymGrkt5_24 = ifelse(is.na(moymGrkt5_24), moymGrkt5_24hs, moymGrkt5_24),
+    moymPerGrkt5_24 = ifelse(is.na(moymPerGrkt5_24), moymPerGrkt5_24hs, moymPerGrkt5_24)
+  ) %>%
+  select(-moymGrkt5_24hs, -moymPerGrkt5_24hs)
+
+
+# 2023-2024 data
+hs_moy23 <- readxl::read_xlsx("data/2023-2024 MOYM Analysis.xlsx", sheet = 6) %>%
+  filter(!is.na(Campus)) %>%
+  rename(
+    moymPerGrkt5_23hs = "% MOY Moves (Grades Kn-5)",
+    moymGrkt5_23hs = '# MOY Moves (Grades Kn-5)',
+    name = "Campus"
+  ) %>%
   mutate(name = paste0(name, "  High"))
+hs_moy23 <- hs_moy23[-1,]
+hs_moy23 <- hs_moy23 %>%
+  select(name, moymGrkt5_23hs, moymPerGrkt5_23hs)
+
 disdprofiles <- disdprofiles %>%
   left_join(hs_moy23, by = "name") %>%
   mutate(
-    moymGrkt5_23 = ifelse(is.na(moymGrkt5_23.x), moymGrkt5_23.y, moymGrkt5_23.x),  
-    moymPerGrkt5_23 = ifelse(is.na(moymPerGrkt5_23.x), moymPerGrkt5_23.y, moymPerGrkt5_23.x)
+    moymGrkt5_23 = ifelse(is.na(moymGrkt5_23), moymGrkt5_23hs, moymGrkt5_23),
+    moymPerGrkt5_23 = ifelse(is.na(moymPerGrkt5_23), moymPerGrkt5_23hs, moymPerGrkt5_23)
   ) %>%
-  select(-moymGrkt5_23.x, -moymGrkt5_23.y, -moymPerGrkt5_23.x, -moymPerGrkt5_23.y)
+  select(-moymGrkt5_23hs, -moymPerGrkt5_23hs) %>%
+  mutate(moymGrkt5_23 = as.numeric(moymGrkt5_23),
+         moymPerGrkt5_23 = as.numeric(moymPerGrkt5_23),
+         moymGrkt5_24 = as.numeric(moymGrkt5_24),
+         moymPerGrkt5_24 = as.numeric(moymPerGrkt5_24))
+
 
 title <- tags$a(
   div(
@@ -147,7 +168,7 @@ ui <- navbarPage(
           "*NOTE: Market Asking Rent data is sourced from CoStar and averages the two bedroom asking rent price for large multi-family apartment complexes."
         ),
         p(style = "font-size: 12px; color: gray;", 
-          "*NOTE: This tool is designed to present a range of housing-related metrics specific to each campus attendance zone within the Dallas Independent School District (DISD). Utilizing the comprehensive data from the 2022 5-Year American Community Survey, this tool offers users a detailed visualization of various key metrics. These metrics have been sourced from the American Community Survey, Dallas County, and CoStar, and have been estimated across attendance zones by the Child Poverty Action Lab (CPAL) to accurately reflect the unique characteristics of each attendance zone."
+          "*NOTE: This tool is designed to present a range of housing-related metrics specific to each campus attendance zone within the Dallas Independent School District (DISD). Utilizing the comprehensive data from the 2023 5-Year American Community Survey, this tool offers users a detailed visualization of various key metrics. These metrics have been sourced from the American Community Survey, Dallas County, and CoStar, and have been estimated across attendance zones by the Child Poverty Action Lab (CPAL) to accurately reflect the unique characteristics of each attendance zone."
         )
         
       ),
@@ -181,7 +202,7 @@ server <- function(input, output, session) {
                            "This tool is designed to present a range of housing-related metrics specific to each campus attendance zone within the Dallas Independent School District (DISD). Utilizing the comprehensive data from the 2022 5-Year American Community Survey, this tool offers users a detailed visualization of various key metrics. These metrics have been sourced from the American Community Survey, Dallas County, and CoStar, and have been estimated across attendance zones by the Child Poverty Action Lab (CPAL) to accurately reflect the unique characteristics of each attendance zone.<br><br>",
                            "One of the notable features of this tool is its ability to present annual figures aligned with school years rather than calendar years, providing a more relevant and context-specific understanding of the data. Included in this tool is eviction filing rate, calculated as the number of evictions filed in a school attendance zone during a school year per 1,000 renter-occupied households. This rate offers valuable insights into the housing stability and challenges faced within each zone.<br><br>",
                            "Property data sourced from CoStar may be incomplete and only includes large multi-family apartment complexes within attendance zone.<br><br>",
-                           "Overall, the Dallas ISD Campus Housing Profiles tool is a strong resource for those seeking to understand the housing landscape within specific Dallas ISD attendance zones.<br><br>", "This tool was last updated <strong>February 18th, 2025</strong>.")),
+                           "Overall, the Dallas ISD Campus Housing Profiles tool is a strong resource for those seeking to understand the housing landscape within specific Dallas ISD attendance zones.<br><br>", "This tool was last updated <strong>July 10, 2025</strong>.")),
     easyClose = TRUE,
     size = "l",
     footer = tagList(modalButton("Dismiss"))
@@ -244,12 +265,12 @@ server <- function(input, output, session) {
           'Multi-Family Units' = tot_units,
           'Market Asking Rent' = paste0("$", prettyNum(round(MAR, digits = 0), big.mark = ",", format = "d")),
           'Est Income to Afford Market Asking Rent' = paste0("$", prettyNum(round(IncomeNeed, digits = 0), big.mark = ",", format = "d")),
-          'Middle of Year Moves K-5 (2022-2023)' = ifelse(
-            grepl("High", name, ignore.case = TRUE), # Check if "High" is in the name
+          'Middle of Year Moves K-5 (2023-2024)' = ifelse(
+            grepl(" High", name, ignore.case = TRUE), # Check if "High" is in the name
             paste0(ifelse(is.na(moymPerGrkt5_23), NA, paste0(moymGrkt5_23, " (", round(moymPerGrkt5_23 * 100, digits = 1), "%)")), "*"), # Add asterisk for high schools
             ifelse(is.na(moymPerGrkt5_23), NA, paste0(moymGrkt5_23, " (", round(moymPerGrkt5_23 * 100, digits = 1), "%)")) # No asterisk for others
           ),
-          'Middle of Year Moves K-5 (2023-2024)' = ifelse(
+          'Middle of Year Moves K-5 (2024-2025)' = ifelse(
             grepl("High", name, ignore.case = TRUE),
             paste0(ifelse(is.na(moymPerGrkt5_24), NA, paste0(moymGrkt5_24, " (", round(moymPerGrkt5_24 * 100, digits = 1), "%)")), "*"),
             ifelse(is.na(moymPerGrkt5_24), NA, paste0(moymGrkt5_24, " (", round(moymPerGrkt5_24 * 100, digits = 1), "%)"))
@@ -295,7 +316,7 @@ server <- function(input, output, session) {
       mutate(name = relevel(as.factor(name), "Dallas ISD"))
     
     hchart(data_to_plot, "line", hcaes(x = chartYear, y = evicRate, group = name)) %>%
-      hc_xAxis(categories = unique(data_to_plot$chartYear)) %>%
+      hc_xAxis(title = list(text = ""), categories = unique(data_to_plot$chartYear)) %>%
       hc_yAxis(title = list(text = "")) %>%
       hc_title(text = paste0(input$campus, " Attendance Zone<br><sup>Eviction Filing Rate by ", input$yearType, "</sup>")) %>%
       hc_tooltip(pointFormat = "Eviction Filing Rate: {point.y:.2f}") %>%
