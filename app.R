@@ -76,12 +76,14 @@ disdeviction <- disdevictions %>%
     moymGrkt5 = case_when(
       SchoolYear == "2023-2024" ~ as.numeric(moymGrkt5_23),
       SchoolYear == "2024-2025" ~ as.numeric(moymGrkt5_24),
+      SchoolYear == "2022-2023" ~ as.numeric(moymGrkt5_22),
       TRUE ~ NA_real_
     ),
     # Gr K-5 percents
     moymPerGrkt5 = case_when(
       SchoolYear == "2023-2024" ~ as.numeric(moymPerGrkt5_23),
       SchoolYear == "2024-2025" ~ as.numeric(moymPerGrkt5_24),
+      SchoolYear == "2022-2023" ~ as.numeric(moymPerGrkt5_22),
       TRUE ~ NA_real_
     ),
     
@@ -89,20 +91,22 @@ disdeviction <- disdevictions %>%
     moymGr1t3 = case_when(
       SchoolYear == "2023-2024" ~ as.numeric(moymGr1t3_23),
       SchoolYear == "2024-2025" ~ as.numeric(moymGr1t3_24),
+      SchoolYear == "2022-2023" ~ as.numeric(moymGr1t3_22),
       TRUE ~ NA_real_
     ),
     # Gr 1-3 percents
     moymPerGr1t3 = case_when(
       SchoolYear == "2023-2024" ~ as.numeric(moymPerGr1t3_23),
       SchoolYear == "2024-2025" ~ as.numeric(moymPerGr1t3_24),
+      SchoolYear == "2022-2023" ~ as.numeric(moymPerGr1t3_22),
       TRUE ~ NA_real_
     )
   ) %>%
   select(
-    -moymGrkt5_23, -moymGrkt5_24,
-    -moymPerGrkt5_23, -moymPerGrkt5_24,
-    -moymGr1t3_23, -moymGr1t3_24,
-    -moymPerGr1t3_23, -moymPerGr1t3_24
+    -moymGrkt5_23, -moymGrkt5_24, -moymGrkt5_22,
+    -moymPerGrkt5_23, -moymPerGrkt5_24,  -moymPerGrkt5_22,
+    -moymGr1t3_23, -moymGr1t3_24, -moymGr1t3_22,
+    -moymPerGr1t3_23, -moymPerGr1t3_24, -moymPerGr1t3_22
   )
 
 
@@ -344,7 +348,7 @@ server <- function(input, output, session) {
     # Assuming 'disdevictions' is your data frame
     data_to_plot <- reactive_disdevictions() %>%
       filter((name == input$campus | name == "Dallas ISD") &
-               chartYear %in% c("2023-2024", "2024-2025")) %>%
+               chartYear %in% c("2023-2024", "2024-2025", "2022-2023")) %>%
       mutate(
         name = relevel(as.factor(name), "Dallas ISD"))
     
@@ -364,7 +368,7 @@ server <- function(input, output, session) {
     # Assuming 'disdevictions' is your data frame
     data_to_plot <- reactive_disdevictions() %>%
       filter((name == input$campus | name == "Dallas ISD") &
-               chartYear %in% c("2023-2024", "2024-2025")) %>%
+               chartYear %in% c("2023-2024", "2024-2025", "2022-2023")) %>%
       mutate(
         name = relevel(as.factor(name), "Dallas ISD"),
         moymPerGrkt5 = moymPerGrkt5 * 100
