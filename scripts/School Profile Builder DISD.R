@@ -98,7 +98,7 @@ evictions <- import("data/NTEP_eviction_cases.csv") %>%
 #middle of year moves for elementary schools
 # moym <- googlesheets4::read_sheet(ss = "https://docs.google.com/spreadsheets/d/1CF2OuTe_dEKoUa9UPJvwta2tuwEXEAl-7OUdk82mY-M/",
 #                    sheet = "Change by Campus ID") %>%
-moym <- read_excel("data/2024-2025 MOYM Analysis.xlsx", sheet = "Change by Campus ID") %>% 
+moym_23 <- read_excel("data/2024-2025 MOYM Analysis.xlsx", sheet = "Change by Campus ID") %>% 
   janitor::clean_names(.) %>%
   filter(!is.na(campus)) %>%
   transmute(SLN = as.double(tea_campus_id),
@@ -110,6 +110,18 @@ moym <- read_excel("data/2024-2025 MOYM Analysis.xlsx", sheet = "Change by Campu
             moymGrkt5_24 = as.numeric(number_moy_moves_grades_kn_5_2024_2025),
             moymGr1t3_23 = as.numeric(number_moy_moves_grades_1_3_2023_2024),
             moymGrkt5_23 = as.numeric(number_moy_moves_grades_kn_5_2023_2024))
+
+moym_22 <- read_excel("data/2022-2023 MOYM Analysis.xlsx", sheet = "By Campus ID") %>%
+  janitor::clean_names(.) %>%
+  filter(!is.na(campus)) %>%
+  transmute(SLN = as.double(tea_campus_id),
+            moymPerGr1t3_22 = as.numeric(percent_moy_moves_grades_1_3),
+            moymPerGrkt5_22 = as.numeric(percent_moy_moves_grades_kn_5),
+            moymGr1t3_22 = as.numeric(number_moy_moves_grades_1_3),
+            moymGrkt5_22 = as.numeric(number_moy_moves_grades_kn_5))
+
+moym <- moym_23 %>%
+  left_join(moym_22, by = "SLN")
 
 #### DISD School Boundary Demographics #####
 campus_elem <- st_read(paste0(libDB, "Data Library/Dallas Independent School District/2024_2025 School Year/Elementary_Attendance_Boundaries.geojson")) %>%
@@ -342,12 +354,12 @@ evic_all <- evic_elem %>%
 
 evic_schools <- rbind(evic_elem, evic_midd, evic_high, evic_all)
 
-st_write(profile_elem, "Data/DISD Demographic Elementary School Profiles.geojson", delete_dsn = TRUE)
-st_write(profile_midd, "Data/DISD Demographic Middle School Profiles.geojson", delete_dsn = TRUE)
-st_write(profile_high, "Data/DISD Demographic High School Profiles.geojson", delete_dsn = TRUE)
+st_write(profile_elem, "data/DISD Demographic Elementary School Profiles.geojson", delete_dsn = TRUE)
+st_write(profile_midd, "data/DISD Demographic Middle School Profiles.geojson", delete_dsn = TRUE)
+st_write(profile_high, "data/DISD Demographic High School Profiles.geojson", delete_dsn = TRUE)
 
-export(profile_campus, "Data/DISD Demographic Campus Profiles.csv")
-export(evic_schools, "Data/DISD Evictions by Boundary.csv")
+export(profile_campus, "data/DISD Demographic Campus Profiles.csv")
+export(evic_schools, "data/DISD Evictions by Boundary.csv")
 
 st_write(profile_elem, "data/DISD Demographic Elementary School Profiles.geojson", delete_dsn = TRUE)
 st_write(profile_midd, "data/DISD Demographic Middle School Profiles.geojson", delete_dsn = TRUE)

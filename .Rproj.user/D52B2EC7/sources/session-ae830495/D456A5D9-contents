@@ -65,6 +65,50 @@ disdprofiles <- disdprofiles %>%
          moymGrkt5_24 = as.numeric(moymGrkt5_24),
          moymPerGrkt5_24 = as.numeric(moymPerGrkt5_24))
 
+library(dplyr)
+
+disdeviction <- disdevictions %>%
+  mutate(
+    # Clean up any funky hyphens just in case
+    SchoolYear = gsub("\u2013", "-", SchoolYear),
+    
+    # Gr K–5 counts
+    moymGrkt5 = case_when(
+      SchoolYear == "2023-2024" ~ as.numeric(moymGrkt5_23),
+      SchoolYear == "2024-2025" ~ as.numeric(moymGrkt5_24),
+      SchoolYear == "2022-2023" ~ as.numeric(moymGrkt5_22),
+      TRUE ~ NA_real_
+    ),
+    # Gr K–5 percents
+    moymPerGrkt5 = case_when(
+      SchoolYear == "2023-2024" ~ as.numeric(moymPerGrkt5_23),
+      SchoolYear == "2024-2025" ~ as.numeric(moymPerGrkt5_24),
+      SchoolYear == "2022-2023" ~ as.numeric(moymPerGrkt5_22),
+      TRUE ~ NA_real_
+    ),
+    
+    # Gr 1–3 counts
+    moymGr1t3 = case_when(
+      SchoolYear == "2023-2024" ~ as.numeric(moymGr1t3_23),
+      SchoolYear == "2024-2025" ~ as.numeric(moymGr1t3_24),
+      SchoolYear == "2022-2023" ~ as.numeric(moymGr1t3_22),
+      TRUE ~ NA_real_
+    ),
+    # Gr 1–3 percents
+    moymPerGr1t3 = case_when(
+      SchoolYear == "2023-2024" ~ as.numeric(moymPerGr1t3_23),
+      SchoolYear == "2024-2025" ~ as.numeric(moymPerGr1t3_24),
+      SchoolYear == "2022-2023" ~ as.numeric(moymPerGr1t3_22),
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  select(
+    -moymGrkt5_23, -moymGrkt5_24, -moymGrkt5_22,
+    -moymPerGrkt5_23, -moymPerGrkt5_24,  -moymPerGrkt5_22,
+    -moymGr1t3_23, -moymGr1t3_24, -moymGr1t3_22,
+    -moymPerGr1t3_23, -moymPerGr1t3_24, -moymPerGr1t3_22
+  )
+
 
 title <- tags$a(
   div(
@@ -184,6 +228,15 @@ ui <- navbarPage(
         ),
         highchartOutput("barChart"),
         br(),
+        
+        conditionalPanel(
+          condition = "input.yearType === 'School Year' && input.schoolType === 'Elementary School'",
+          fluidRow(
+            column(6, highchartOutput('moymChart')),
+            column(6, highchartOutput('moymBar'))
+          )
+        ),
+        br(),
         highchartOutput("lineChart"),
         br(),
         highchartOutput("amtChart"),
@@ -231,7 +284,7 @@ server <- function(input, output, session) {
   
   reactive_disdevictions <- reactive({
     req(input$campus, input$yearType)  # Ensure inputs are available
-    data <- disdevictions %>% filter(name == input$campus | name == "Dallas ISD")
+    data <- disdeviction %>% filter(name == input$campus | name == "Dallas ISD")
     
     if (input$yearType == "Calendar Year") {
       data <- data %>% mutate(chartYear = Year)  
@@ -289,6 +342,58 @@ server <- function(input, output, session) {
                 rownames = TRUE
       )
   })
+  # # of MOYM by School Year Chart
+  output$moymBar <- renderHighchart({
+    
+    # Assuming 'disdevictions' is your data frame
+    data_to_plot <- reactive_disdevictions() %>%
+      filter((name == input$campus | name == "Dallas ISD") &
+               chartYear %in% c("2023-2024", "2024-2025", "2022-2023")) %>%
+      mutate(
+        name = relevel(as.factor(name), "Dallas ISD"))
+    
+    hchart(data_to_plot, type = "column", hcaes(x = chartYear, y = moymGrkt5)) %>%
+      hc_plotOptions(column = list(dataLabels = list(enabled = TRUE))) %>%
+      hc_xAxis(title = list(text = ""), categories = data_to_plot$chartYear) %>%
+      hc_yAxis(title = list(text = "")) %>%
+      hc_title(text = paste0(input$campus, " Attendance Zone<br><sup>Total Mid-Year Moves by ", input$yearType, "</sup>")) %>%
+      hc_tooltip(headerFormat = "<span style=\"font-size: 10px\">{point.key}</span><br/>",
+                 pointFormat = "Total Moves: {point.y}") %>%
+      hc_colors(cpal_colors())
+  })
+  
+  # % of MOYM by School Year Chart
+  output$moymChart <- renderHighchart({
+  
+    # Assuming 'disdevictions' is your data frame
+    data_to_plot <- reactive_disdevictions() %>%
+      filter((name == input$campus | name == "Dallas ISD") &
+               chartYear %in% c("2023-2024", "2024-2025", "2022-2023")) %>%
+      mutate(
+        name = relevel(as.factor(name), "Dallas ISD"),
+        moymPerGrkt5 = moymPerGrkt5 * 100
+      ) %>%
+      filter(!is.na(moymPerGrkt5))   # drop NAs before plotting
+    
+    hchart(data_to_plot, "line", hcaes(x = chartYear, y = moymPerGrkt5, group = name)) %>%
+      hc_xAxis(title = list(text = ""), categories = unique(data_to_plot$chartYear)) %>%
+      hc_yAxis(title = list(text = "")) %>%
+      hc_title(text = paste0(input$campus, " Middle of Year Moves <br><sup> % of Students Grade k - 5 ", input$yearType, "</sup>")) %>%
+      hc_tooltip(pointFormat = "MOYM Percentage: {point.y:.2f} %") %>%
+      hc_colors(cpal_colors()) %>%
+      hc_legend(align = 'center', verticalAlign = 'bottom', layout = 'horizontal') %>%
+      hc_plotOptions(series = list(
+        lineWidth = 4,  # Setting the line width to twice the default size
+        marker = list(
+          enabled = TRUE,
+          symbol = "circle",  # Ensuring markers are circles
+          radius = 6,         # Adjust the size of the marker if needed
+          fillColor = NULL,   # Setting the color of markers to match the line
+          lineWidth = 2,
+          lineColor = NULL    # Line color of marker (border) to match the line
+        )
+      ))
+  })
   
   # Total Evictions by School Year Line Graph
   output$barChart <- renderHighchart({
@@ -304,7 +409,7 @@ server <- function(input, output, session) {
       hc_title(text = paste0(input$campus, " Attendance Zone<br><sup>Total Eviction Filings by ", input$yearType, "</sup>")) %>%
       hc_tooltip(headerFormat = "<span style=\"font-size: 10px\">{point.key}</span><br/>",
                  pointFormat = "Total Evictions: {point.y}") %>%
-      hc_colors(palette_cpal_main)
+      hc_colors(cpal_colors())
   })
     
   # Eviction Filing Rate by School Year Bar Graph
@@ -320,7 +425,7 @@ server <- function(input, output, session) {
       hc_yAxis(title = list(text = "")) %>%
       hc_title(text = paste0(input$campus, " Attendance Zone<br><sup>Eviction Filing Rate by ", input$yearType, "</sup>")) %>%
       hc_tooltip(pointFormat = "Eviction Filing Rate: {point.y:.2f}") %>%
-      hc_colors(palette_cpal_main) %>%
+      hc_colors(cpal_colors()) %>%
       hc_legend(align = 'center', verticalAlign = 'bottom', layout = 'horizontal') %>%
       hc_plotOptions(series = list(
         lineWidth = 4,  # Setting the line width to twice the default size
@@ -355,7 +460,7 @@ server <- function(input, output, session) {
       hc_title(text = paste0(input$campus, " Attendance Zone<br><sup>Average Eviction Filing Amount by ", input$yearType, "</sup>")) %>%
       hc_tooltip(headerFormat = "<span style=\"font-size: 10px\">{point.key}</span><br/>",
                  pointFormat = "Total Evictions: ${point.y:.2f}") %>%
-      hc_colors(palette_cpal_main)
+      hc_colors(cpal_colors())
   })
   
   # School Feeder Pattern Leaflet Map
@@ -383,7 +488,7 @@ server <- function(input, output, session) {
     feeder_data %>%
       leaflet(options = leafletOptions(zoomControl = FALSE, dragging = FALSE)) %>%
       fitBounds(bbox[1], bbox[2], bbox[3], bbox[4]) %>%
-      addTiles(urlTemplate = cpal_mapbox_color, attribution = cpal_leaflet) %>%
+      addProviderTiles("CartoDB.Positron", group = "Base") %>%
       addPolygons(weight = 1, opacity = 0.5, color = "#686158", fillOpacity = 0.2) %>%
       addCircleMarkers(
         data = filter(disdpoints, name == input$campus),
