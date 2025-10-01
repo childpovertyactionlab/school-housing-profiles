@@ -317,17 +317,7 @@ server <- function(input, output, session) {
           'Multi-Family Complexes' = tot_mf,
           'Multi-Family Units' = tot_units,
           'Market Asking Rent' = paste0("$", prettyNum(round(MAR, digits = 0), big.mark = ",", format = "d")),
-          'Est Income to Afford Market Asking Rent' = paste0("$", prettyNum(round(IncomeNeed, digits = 0), big.mark = ",", format = "d")),
-          'Middle of Year Moves K-5 (2023-2024)' = ifelse(
-            grepl(" High", name, ignore.case = TRUE), # Check if "High" is in the name
-            paste0(ifelse(is.na(moymPerGrkt5_23), NA, paste0(moymGrkt5_23, " (", round(moymPerGrkt5_23 * 100, digits = 1), "%)")), "*"), # Add asterisk for high schools
-            ifelse(is.na(moymPerGrkt5_23), NA, paste0(moymGrkt5_23, " (", round(moymPerGrkt5_23 * 100, digits = 1), "%)")) # No asterisk for others
-          ),
-          'Middle of Year Moves K-5 (2024-2025)' = ifelse(
-            grepl("High", name, ignore.case = TRUE),
-            paste0(ifelse(is.na(moymPerGrkt5_24), NA, paste0(moymGrkt5_24, " (", round(moymPerGrkt5_24 * 100, digits = 1), "%)")), "*"),
-            ifelse(is.na(moymPerGrkt5_24), NA, paste0(moymGrkt5_24, " (", round(moymPerGrkt5_24 * 100, digits = 1), "%)"))
-          )
+          'Est Income to Afford Market Asking Rent' = paste0("$", prettyNum(round(IncomeNeed, digits = 0), big.mark = ",", format = "d"))
         ) %>%
         t() %>%
         as.data.frame() %>%
@@ -356,7 +346,7 @@ server <- function(input, output, session) {
       hc_plotOptions(column = list(dataLabels = list(enabled = TRUE))) %>%
       hc_xAxis(title = list(text = ""), categories = data_to_plot$chartYear) %>%
       hc_yAxis(title = list(text = "")) %>%
-      hc_title(text = paste0(input$campus, " Attendance Zone<br><sup>Total Mid-Year Moves by ", input$yearType, "</sup>")) %>%
+      hc_title(text = paste0(input$campus, " <br><sup>Total Middle of Year Moves by ", input$yearType, "</sup>")) %>%
       hc_tooltip(headerFormat = "<span style=\"font-size: 10px\">{point.key}</span><br/>",
                  pointFormat = "Total Moves: {point.y}") %>%
       hc_colors(cpal_colors())
@@ -378,7 +368,7 @@ server <- function(input, output, session) {
     hchart(data_to_plot, "line", hcaes(x = chartYear, y = moymPerGrkt5, group = name)) %>%
       hc_xAxis(title = list(text = ""), categories = unique(data_to_plot$chartYear)) %>%
       hc_yAxis(title = list(text = "")) %>%
-      hc_title(text = paste0(input$campus, " Middle of Year Moves <br><sup> % of Students Grade k - 5 ", input$yearType, "</sup>")) %>%
+      hc_title(text = paste0(input$campus, " Middle of Year Move <br><sup> % for K-5 Students Grades by ", input$yearType, "</sup>")) %>%
       hc_tooltip(pointFormat = "MOYM Percentage: {point.y:.2f} %") %>%
       hc_colors(cpal_colors()) %>%
       hc_legend(align = 'center', verticalAlign = 'bottom', layout = 'horizontal') %>%

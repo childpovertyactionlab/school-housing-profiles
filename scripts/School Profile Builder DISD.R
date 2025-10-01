@@ -89,10 +89,10 @@ yearSchool <- function(x){
 }
 
 evictions <- import("data/NTEP_eviction_cases.csv") %>%
-  filter(!is.na(lon) | !is.na(lat)) %>%
-  st_as_sf(coords = c(x = "lon", y = "lat"), crs = 4326) %>%
+  filter(!is.na(X) | !is.na(Y)) %>%
+  st_as_sf(coords = c(x = "X", y = "Y"), crs = 4326) %>%
   st_transform(crs = 6584) %>%
-  mutate(SchoolYear = schoolyears(x = date)) %>%
+  mutate(SchoolYear = schoolyears(x = filed_date)) %>%
   filter(SchoolYear != "ERROR")
 
 #middle of year moves for elementary schools
