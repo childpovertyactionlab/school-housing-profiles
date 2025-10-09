@@ -88,7 +88,7 @@ yearSchool <- function(x){
                                                    ))))))))
 }
 
-evictions <- import("data/NTEP_eviction_cases.csv") %>%
+evictions <- import("data/EvictionRecords FINAL.csv") %>%
   filter(!is.na(X) | !is.na(Y)) %>%
   st_as_sf(coords = c(x = "X", y = "Y"), crs = 4326) %>%
   st_transform(crs = 6584) %>%
